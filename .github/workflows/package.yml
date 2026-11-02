@@ -17,6 +17,10 @@ on:
         description: "Create a NEW installation seed if no saved seed exists (iPadOS 27 only)"
         type: boolean
         default: false
+      userdata:
+        description: "Also build the userdata root image (ERASES the partition when flashed; about 16 GB)"
+        type: boolean
+        default: false
       data_seed_url:
         description: "Optional original data.dbr URL for an existing installation; otherwise use the saved cache"
         type: string
@@ -162,3 +166,26 @@ jobs:
             UniXNU/out/sheng/*/*/payload/payload.img
             UniXNU/out/sheng/*/*/kernel/kernel.macho
             UniXNU/out/sheng/*/*/package.manifest.json
+      # After the images upload: a userdata failure must not lose the boot image of this run.
+      - name: userdata
+        if: inputs.userdata
+        working-directory: UniXNU
+        env:
+          UNIXNU_UNIQUE_CHIP_ID: ${{ secrets.UNIXNU_UNIQUE_CHIP_ID }}
+          OS_PROFILE: ${{ inputs.os }}
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          ./unixnu build userdata -D ../device --os "$OS_PROFILE"
+          ls -l out/sheng/*/*/userdata/
+          df -h "$GITHUB_WORKSPACE"
+      - name: userdata image
+        if: inputs.userdata
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-${{ inputs.os }}
+          retention-days: 1
+          compression-level: 1
+          if-no-files-found: error
+          path: |
+            UniXNU/out/sheng/*/*/userdata/userdata-root.img
+            UniXNU/out/sheng/*/*/userdata/userdata-root.json
